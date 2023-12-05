@@ -1,13 +1,22 @@
 from instaloader import Instaloader, Profile
-from datetime import datetime
-from itertools import dropwhile, takewhile
+from datetime import datetime, timedelta
 
+def return_captions(profiles):
+    L = Instaloader()
+    captions = []
+    for username in profiles:
+        profile = Profile.from_username(L.context, username)
+        posts = sorted(profile.get_posts(), key=lambda post: post.likes, reverse=True)
+        
+        now = datetime.now()
+        one_week_ago = now - timedelta(weeks=1)
 
-L = Instaloader()
-PROFILE = "bencebansaghi" #instagram username for profile you want to download data
-profile = Profile.from_username(L.context, PROFILE)
-posts_sorted_by_likes = sorted(profile.get_posts(), key=lambda post: post.likes, reverse=True)
-selected_range = posts_sorted_by_likes[0:2] #to download from only 2 posts
-for post in selected_range:
-    L.download_post(post, PROFILE)
-    print(post.caption)
+        selected_range = [post for post in posts if one_week_ago <= post.date <= now]
+        for post in selected_range:
+            L.download_post(post, username)
+            captions.append(post.caption)
+
+    return captions
+        
+if __name__ == "__main__":
+    print(return_captions(["lahoevents","aether_ry"]))
