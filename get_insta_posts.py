@@ -1,4 +1,5 @@
-from instaloader import Instaloader, Profile
+from instaloader.instaloader import Instaloader
+from instaloader.structures import Profile
 from datetime import datetime, timedelta
 from itertools import dropwhile, takewhile
 
