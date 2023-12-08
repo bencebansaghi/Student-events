@@ -35,7 +35,7 @@ def return_captions(profiles,session_file):
 if __name__ == "__main__":
     profiles = ["aether_ry", "lahoevents", "koeputkiappro", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry"]
     session_file_path = os.getcwd()
-    session_file_name = "\\Student-events\\session-bencebansaghi"
+    session_file_name = "\\session-bencebansaghi"
     session_file = session_file_path + session_file_name
     captions = return_captions(profiles,session_file)
     for caption in captions:
