@@ -8,10 +8,10 @@ import pathlib
 
 
 
-def return_captions(profiles, session_file):
+def return_captions(profiles_array, session_file_path): # Returns the captions of the posts from the last week of the given profiles as an array
     with Instaloader(quiet=True,dirname_pattern=".\\profiles") as L:
         try:
-            L.load_session_from_file("bencebansaghi", filename=session_file)
+            L.load_session_from_file("bencebansaghi", filename=session_file_path)
         except instaloader.exceptions.ConnectionException as e:
             print(f"Login error: {e}")
         except FileNotFoundError as e:
@@ -20,15 +20,18 @@ def return_captions(profiles, session_file):
             print(f"Unknown error: {e}")
 
     captions = []
-    for username in profiles:
+    for username in profiles_array:
         try:
             posts = Profile.from_username(L.context, username).get_posts() 
         except instaloader.exceptions.ProfileNotExistsException as e:
             print(f"Profile {username} does not exist: {e}")
             continue
+        except Exception as e:
+            print(f"Unknown error: {e}")
+            continue
         now = datetime.now()
         one_week_ago = now - timedelta(weeks=1)
-        for post in takewhile(lambda p: p.date > one_week_ago, dropwhile(lambda p: p.date > now, posts)):
+        for post in takewhile(lambda p: p.date > one_week_ago, dropwhile(lambda p: p.date > now, posts)): # Get the posts from the last week
             L.download_post(post, username)
             captions.append(post.caption)
 
