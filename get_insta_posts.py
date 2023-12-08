@@ -1,4 +1,3 @@
-from tkinter import E
 from instaloader.instaloader import Instaloader
 from instaloader.structures import Profile
 from datetime import datetime, timedelta
