@@ -1,3 +1,4 @@
 .env
-.profiles/
-.*UTC*
+profiles/
+api_key.py
+output.txt

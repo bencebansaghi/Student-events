@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from itertools import dropwhile, takewhile
 import instaloader.exceptions
 import pathlib
+import time
 
 
 
@@ -29,10 +30,11 @@ def return_captions(profiles_array, session_file_path): # Returns the captions o
             print(f"Unknown error: {e}")
             continue
         now = datetime.now()
-        one_week_ago = now - timedelta(weeks=1)
+        one_week_ago = now - timedelta(weeks=2)
         for post in takewhile(lambda p: p.date > one_week_ago, dropwhile(lambda p: p.date > now, posts)): # Get the posts from the last week
             L.download_post(post, username)
             captions.append(post.caption)
+        time.sleep(0.5)
 
     return captions
 
