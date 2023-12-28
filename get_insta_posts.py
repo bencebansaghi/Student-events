@@ -5,19 +5,28 @@ from itertools import dropwhile, takewhile
 import instaloader.exceptions
 import pathlib
 import time
+from dotenv import load_dotenv
+import os
+
 
 
 
 def return_captions(profiles_array, session_file_path): # Returns the captions of the posts from the last week of the given profiles as an array
     with Instaloader(quiet=True,dirname_pattern=".\\profiles") as L:
-        try:
-            L.load_session_from_file("bencebansaghi", filename=session_file_path)
-        except instaloader.exceptions.ConnectionException as e:
-            print(f"Login error: {e}")
-        except FileNotFoundError as e:
-            print(f"File not found error: {e}\nPlease make sure the session is saved to the same dir as the script.")
+        try: #first we try to login with .env variables
+            load_dotenv()
+            L.login(str(os.getenv("INSTA_USERNAME")), str(os.getenv("INSTA_PASSWORD"))) #casting to string is necessary because of the way dotenv works
+            print("Logged in with .env variables")
         except Exception as e:
-            print(f"Unknown error: {e}")
+            try:  #if that fails, we try to load the session from a file
+                L.load_session_from_file("bencebansaghi", filename=session_file_path) # You can get the session file by following the steps at https://instaloader.github.io/troubleshooting.html
+                print("Logged in with session file")
+            except instaloader.exceptions.ConnectionException as e:
+                print(f"Login error: {e}")
+            except FileNotFoundError as e:
+                print(f"File not found error: {e}\nPlease make sure the session is saved to the same dir as the script.")
+            except Exception as e:
+                print(f"Unknown error: {e}")
 
     captions = []
     for username in profiles_array:
@@ -30,15 +39,15 @@ def return_captions(profiles_array, session_file_path): # Returns the captions o
             print(f"Unknown error: {e}")
             continue
         now = datetime.now()
-        one_week_ago = now - timedelta(weeks=2)
+        one_week_ago = now - timedelta(weeks=1) 
         for post in takewhile(lambda p: p.date > one_week_ago, dropwhile(lambda p: p.date > now, posts)): # Get the posts from the last week
             L.download_post(post, username)
             captions.append(post.caption)
-        time.sleep(0.5)
+        time.sleep(0.5) # To avoid spamming the server
 
     return captions
 
-if __name__ == "__main__":
+if __name__ == "__main__": #example usage
     profiles = ["aether_ry", "lahoevents", "koeputkiappro", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry"]
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
     session_file_name = "\\session-bencebansaghi" # Name of the session file

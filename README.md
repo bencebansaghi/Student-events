@@ -4,64 +4,66 @@ A telegram chatbot which displays the information about student events in Lahti 
 ## Table of contents
 
 
-# get_insta_posts.py
+## get_insta_posts.py
 
-This Python script is used to fetch Instagram posts from a list of profiles. It uses the `instaloader` library to interact with Instagram's API.
+This script uses the `instaloader` library to fetch Instagram posts from specified profiles. It logs in to Instagram using either environment variables or a session file, then fetches the captions of posts from the last week of the given profiles.
 
-## How it works
+### Functionality
 
-The script iterates over a list of Instagram usernames, fetching the posts from each profile. It handles exceptions for cases where a profile does not exist or any other unknown error occurs.
+The main function, `return_captions(profiles_array, session_file_path)`, takes an array of Instagram profile names and a path to a session file. It returns an array of captions from the posts of the last week from the given profiles.
 
-The script fetches posts from the last two weeks. It downloads each post and appends the caption to a list. After each profile, the script pauses for half a second to avoid hitting Instagram's rate limits.
+The script first tries to log in using the Instagram username and password stored in environment variables. If this fails, it tries to load a session from a file. If both methods fail, it prints an error message.
 
-The list of captions is returned at the end of the script.
+### Usage
 
-## Usage
+1. Install the required Python libraries with `pip install -r requirements.txt`.
+2. Set your Instagram username and password as environment variables `INSTA_USERNAME` and `INSTA_PASSWORD`, or create a session file as described in the [instaloader troubleshooting guide](https://instaloader.github.io/troubleshooting.html).
+3. Run the script with `python get_insta_posts.py`.
 
-To use this script, you need to have a list of Instagram usernames. This list is defined in the `profiles` variable at the bottom of the script.
+### Environment Variables
 
-The script also uses a session file, the path of which is defined by the `session_file_path` and `session_file_name` variables.
+- `INSTA_USERNAME`: Your Instagram username.
+- `INSTA_PASSWORD`: Your Instagram password.
 
-To run the script, simply execute it in a Python environment where the `instaloader` library is installed.
+### Session File
 
-## Dependencies
+If you prefer not to use environment variables, you can create a session file as described in the [instaloader troubleshooting guide](https://instaloader.github.io/troubleshooting.html). The script will attempt to use this if the environment variables are not set.
 
-This script depends on the following Python libraries:
+### Dependencies
 
-- `instaloader`
-- `datetime`
-- `time`
-- `pathlib`
+- `instaloader`: Used to fetch Instagram posts.
+- `datetime`: Used to calculate the date one week ago.
+- `itertools`: Used to iterate over the posts until one week ago.
+- `time`: Used to delay between requests to Instagram.
+- `dotenv`: Used to load environment variables from a .env file.
+- `os`: Used to access environment variables.
 
 Please ensure these are installed in your Python environment before running the script.
 
-# gpt_formater.py
+## gpt_formater.py
 
-This Python script uses the OpenAI API to process Instagram captions fetched from a list of profiles. It uses the `openai` library to interact with the OpenAI API.
+This script uses the OpenAI API to process captions fetched from Instagram posts. It sends the captions to the OpenAI API, which checks for any possible events and returns their data in a specific format.
 
-## How it works
+### Functionality
 
-The script takes a list of Instagram profiles as input and fetches their captions using the `return_captions` function from the `get_insta_posts` module. 
+The script fetches captions from specified Instagram profiles using the `return_captions` function. It then creates a stream to process the captions using the OpenAI API. The API is instructed to return event data in the following format: `{date of the event in the format %d.%m.%Y},{name of the event},{short description of the event (maximum 6 sentences)}`.
 
-It then sends these captions to the OpenAI API, which processes them and returns any possible events in the captions in a specific format. The OpenAI model used is `gpt-3.5-turbo`.
+The script processes the output from the stream and appends it to an array.
 
-The script also handles the translation of captions from Finnish to English.
+### Usage
 
-## Usage
+1. Install the required Python libraries with `pip install -r requirements.txt`.
+2. Set your OpenAI API key as an environment variable `OPENAI_API_KEY` or create an api_key.py file, which returns your api key.
+3. Run the script with `python gpt_formater.py`.
 
-To use this script, you need to have a list of Instagram usernames. This list should be passed as an argument to the `return_formated_events` function.
+### Environment Variables
 
-The script also uses a session file, the path of which is defined by the `session_file_path` and `session_file_name` variables.
+- `OPENAI_API_KEY`: Your OpenAI API key.
 
-To run the script, simply execute it in a Python environment where the `openai` and `pathlib` libraries are installed.
+### Dependencies
 
-## Dependencies
-
-This script depends on the following Python libraries:
-
-- `openai`
-- `pathlib`
-- `get_insta_posts`
-- `api_key`
+- `openai`: Used to interact with the OpenAI API.
+- `os`: Used to access environment variables.
+- `dotenv`: Used to load environment variables from a .env file.
 
 Please ensure these are installed in your Python environment before running the script.
