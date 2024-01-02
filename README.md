@@ -1,9 +1,6 @@
 # Student-events
 A telegram chatbot which displays the information about student events in Lahti at LUT University.
 
-## Table of contents
-
-
 ## get_insta_posts.py
 
 This script uses the `instaloader` library to fetch Instagram posts from specified profiles. It logs in to Instagram using either environment variables or a session file, then fetches the captions of posts from the last week of the given profiles.
