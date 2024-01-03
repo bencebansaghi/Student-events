@@ -3,7 +3,6 @@ from instaloader.structures import Profile
 from datetime import datetime, timedelta
 from itertools import dropwhile, takewhile
 import instaloader.exceptions
-import pathlib
 import time
 from dotenv import load_dotenv
 import os
@@ -26,7 +25,7 @@ def return_captions(profiles_array, session_file_path): # Returns the captions o
             except FileNotFoundError as e:
                 print(f"File not found error: {e}\nPlease make sure the session is saved to the same dir as the script.")
             except Exception as e:
-                print(f"Unknown error: {e}")
+                print(f"Both login methods failed, unknown error: {e}")
 
     captions = []
     for username in profiles_array:
@@ -44,10 +43,11 @@ def return_captions(profiles_array, session_file_path): # Returns the captions o
             L.download_post(post, username)
             captions.append(post.caption)
         time.sleep(0.5) # To avoid spamming the server
-
+    captions = [caption.replace('\n', '') for caption in captions]
     return captions
 
 if __name__ == "__main__": #example usage
+    import pathlib
     profiles = ["aether_ry", "lahoevents", "koeputkiappro", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry"]
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
     session_file_name = "\\session-bencebansaghi" # Name of the session file
