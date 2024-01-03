@@ -2,4 +2,6 @@
 profiles/
 api_key.py
 output.txt
-session_bencebansaghi
+session-bencebansaghi
+__pycache__/
+```
