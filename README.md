@@ -64,3 +64,34 @@ The script processes the output from the stream and appends it to an array.
 - `dotenv`: Used to load environment variables from a .env file.
 
 Please ensure these are installed in your Python environment before running the script.
+
+
+## Chatbot.py
+
+This Python script is a part of a Telegram bot application. It uses the `telegram` library to interact with the Telegram API and the `ics` library to handle calendar events.
+
+### Dependencies
+
+- `datetime`: For handling date and time related tasks.
+- `json`: For parsing and manipulating JSON data.
+- `logging`: For logging events for debugging and analysis.
+- `schedule`: For scheduling tasks.
+- `io` and `pathlib`: For handling file and path operations.
+- `telegram`: For interacting with the Telegram API.
+- `gpt_formater`: A custom module for formatting text.
+- `ics`: For handling calendar events.
+
+### Logging
+
+The script sets up basic logging with a specific format and logging level. It also sets a higher logging level for `httpx` to avoid logging all GET and POST requests.
+
+### Command Handlers
+
+The script defines command handlers for the `/start` and `/help` commands.
+
+- The `/start` command sends a message to the user and presents them with a custom keyboard with two options: "All Events" and "Events in the next week".
+- The `/help` command sends a message to the user with the text "Help!".
+
+### How to Use
+
+To use this script, you need to have a Telegram bot token. You can get this token by creating a new bot on Telegram. Once you have the token, you can run the script and interact with the bot on Telegram.
