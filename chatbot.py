@@ -1,17 +1,12 @@
-from calendar import c
 from datetime import datetime, timedelta
-from itertools import count
 import json
 import logging
-import threading
 import schedule
-import time
 import io
 import pathlib
-from telegram import ForceReply, InputFile, Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, Updater, CallbackQueryHandler, CallbackContext
+from telegram import InputFile, Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler, CallbackContext
 import gpt_formater
-from instaloader.structures import Post
 from ics import Calendar, Event
 
 # Enable logging
