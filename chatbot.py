@@ -1,18 +1,18 @@
 from calendar import c
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import count
 import json
 import logging
 import threading
 import schedule
 import time
+import io
 import pathlib
-
-
-from telegram import ForceReply, Update
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, Updater
-
+from telegram import ForceReply, InputFile, Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, Updater, CallbackQueryHandler, CallbackContext
 import gpt_formater
+from instaloader.structures import Post
+from ics import Calendar, Event
 
 # Enable logging
 logging.basicConfig(
@@ -20,19 +20,28 @@ logging.basicConfig(
 )
 # set higher logging level for httpx to avoid all GET and POST requests being logged
 logging.getLogger("httpx").setLevel(logging.WARNING)
-
 logger = logging.getLogger(__name__)
-
 
 # Define a few command handlers. These usually take the two arguments update and context.
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
-    await update.message.reply_html(
-        rf"Hi {user.mention_html()}!",
-        reply_markup=ForceReply(selective=True),
-    )
+    # Create a custom keyboard with two buttons
+    keyboard = [
+        [{"text": "All Events"}],
+        [{"text": "Events in the next week"}],
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
+    # Starting message
+    await update.message.reply_html(
+        f"Hi, {user.mention_html()}!"
+        "\nChoose an option from the keyboard below to get started.\n\n"
+        "Available options:\n"
+        "📅 Show all events\n"
+        "📆 Show events in the next week",
+        reply_markup=reply_markup,
+    )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /help is issued."""
@@ -40,18 +49,128 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 # This is the function that prints the events
 async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    #Send a message when the command /events is issued.
-    with open("active_events.csv", "r") as f:
-        lines = f.readlines()
-        await update.message.reply_text("Here are the events:")
-        for line in lines:
-            await update.message.reply_text(line)
+    """Send a formatted message with an 'Add to Calendar' button."""
+    # This part handles the "All Events" button
+    if update.message.text.lower() == "all events":
+        with open("active_events.csv", "r") as f:
+            lines = f.readlines()
+            if not lines:
+                await update.message.reply_text("No events found.")
+            else:
+                # Create a list to store all events
+                all_events = []
+                today = datetime.now()
 
+                for line in lines:
+                    # Split only the first two commas to avoid splitting the description
+                    event_data = line.strip().split(",", 2)
+                    if len(event_data) >= 3:
+                        date_str, name, description = event_data[0], event_data[1], event_data[2]
+                        try:
+                            event_date = datetime.strptime(date_str, "%d.%m.%Y")
+                            all_events.append((date_str, name, description))
+                        except ValueError:
+                            pass
+
+                # Sort all events based on date
+                all_events.sort(key=lambda x: datetime.strptime(x[0], "%d.%m.%Y"))
+
+                # Send the formatted messages for all events
+                for event in all_events:
+                    date, name, description = event
+                    formatted_message = (
+                        f"*Name of the event:* {name}\n"
+                        f"*Date:* {date}\n\n"
+                        f"*Description:* {description}\n\n"
+                    )
+
+                    # Create an InlineKeyboardMarkup with 'Add to Calendar' button
+                    keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=f"add_to_calendar:{date}:{name}")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+
+                    # Send the formatted message with the 'Add to Calendar' button
+                    await update.message.reply_markdown(formatted_message, reply_markup=reply_markup)
+
+    # And this part handles the "Events in the next week" button
+    elif "events in the next week" in update.message.text.lower():
+        with open("active_events.csv", "r") as f:
+            lines = f.readlines()
+            if not lines:
+                await update.message.reply_text("No events found.")
+            else:
+                # Create a list to store events within the next week
+                next_week_events = []
+                today = datetime.now()
+
+                for line in lines:
+                    event_data = line.strip().split(",", 2)
+                    if len(event_data) >= 3:
+                        date_str, name, description = event_data[0], event_data[1], event_data[2]
+                        try:
+                            event_date = datetime.strptime(date_str, "%d.%m.%Y")
+                            # Check if the event is within the next week
+                            if today <= event_date <= today + timedelta(days=7):
+                                next_week_events.append((date_str, name, description))
+                        except ValueError:
+                            pass
+
+                # Sort next week events based on date
+                next_week_events.sort(key=lambda x: datetime.strptime(x[0], "%d.%m.%Y"))
+
+                # Send the formatted messages for events within the next week
+                for event in next_week_events:
+                    date, name, description = event
+                    formatted_message = (
+                        f"*Name of the event:* {name}\n"
+                        f"*Date:* {date}\n\n"
+                        f"*Description:* {description}\n\n"
+                    )
+
+                    # Create an InlineKeyboardMarkup with 'Add to Calendar' button
+                    keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=f"add_to_calendar:{date}:{name}")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+
+                    # Send the formatted message with the 'Add to Calendar' button
+                    await update.message.reply_markdown(formatted_message, reply_markup=reply_markup)
+
+# This function handle the "add to calendar" button
+# It will create an iCalendar file and send it to the user
+async def button_click(update: Update, context: CallbackContext) -> None:
+    """Handle button clicks, including 'Add to Calendar' button."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    data = query.data.split(':')
+
+    if data[0] == "add_to_calendar":
+        date_str = data[1]
+        event_name = data[2]
+
+        # Convert the date string to a datetime object with midnight time
+        event_date = datetime.strptime(date_str, "%d.%m.%Y").replace(hour=0, minute=0, second=0)
+
+        # Generate iCalendar file
+        cal = Calendar()
+        event = Event()
+        event.name = event_name
+        event.begin = event_date
+        event.make_all_day()  # Set the event to last the whole day
+        cal.events.add(event)
+
+        # Convert the calendar to bytes
+        cal_str = cal.serialize()
+        cal_bytes = cal_str.encode('utf-8')
+
+        # Send the iCalendar file as a document using InputFile
+        cal_file_input = InputFile(io.BytesIO(cal_bytes), filename=f"{event_name}.ics")
+        await context.bot.send_document(chat_id=user_id, document=cal_file_input)
+
+        await query.answer("Event added to calendar!")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Echo the user message."""
     await update.message.reply_text(update.message.text)
 
+# function that fetches the new events from the instagram accounts and adds them to "active_events.csv"
 def fetch_weekly_events():
     print("Fetching weekly events")
     profiles = ["aether_ry", "lahoevents", "koeputkiappro", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry"]
@@ -89,14 +208,13 @@ def main():
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("events", event_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, event_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    application.add_handler(CallbackQueryHandler(button_click))
     schedule.every().week.do(fetch_weekly_events)
     schedule.every().day.do(remove_old_events)
-    
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()
-
