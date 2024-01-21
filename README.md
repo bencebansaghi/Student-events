@@ -1,4 +1,3 @@
-High definition video link for assignment: https://1drv.ms/v/s!AgWTGs-shub7mCj4nxj1L5rUh57z?e=zypZRI
 # Student-events
 A telegram chatbot which displays the information about student events in Lahti at LUT University.
 
