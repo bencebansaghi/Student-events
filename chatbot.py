@@ -34,13 +34,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "\nChoose an option from the keyboard below to get started.\n\n"
         "Available options:\n"
         "📅 Show all events\n"
-        "📆 Show events in the next week",
+        "📆 Show events in the next week\n\n"
+        "For more information, type /info.",
         reply_markup=reply_markup,
     )
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /help is issued."""
-    await update.message.reply_text("Help!")
+async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send a message when the command /info is issued."""
+    await update.message.reply_html("This bot is hosted by LTKY(?) and was developed by Bence Bánsághi.\n"
+                                    "For any issues, ideas or questions about the bot, please contact <a href='https://www.ltky/'>LTKY</a>.\n"
+                                    "The code of the bot is available on <a href='https://github.com/bencebansaghi/Student-events'>GitHub</a>."
+                                    "For any inquiries about the code, feel free to contact me.\n")
 
 # This is the function that prints the events
 async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -108,7 +112,9 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                                 next_week_events.append((date_str, name, description))
                         except ValueError:
                             pass
-
+                if len(next_week_events) == 0:
+                    await update.message.reply_text("No events found within the next week.")
+                    
                 # Sort next week events based on date
                 next_week_events.sort(key=lambda x: datetime.strptime(x[0], "%d.%m.%Y"))
 
@@ -166,15 +172,17 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(update.message.text)
 
 # function that fetches the new events from the instagram accounts and adds them to "active_events.csv"
-def fetch_weekly_events():
-    print("Fetching weekly events")
+def fetch_daily_events():
+    print("Fetching daily events")
     profiles = ["aether_ry", "lahoevents", "koeputkiappro", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry"]
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
     session_file_name = "\\session-bencebansaghi" # Name of the session file
-    session_file = session_file_path + session_file_name # Full path of the session file
-    result_string = str(gpt_formater.return_formated_events(profiles,session_file))
+    result=gpt_formater.return_formated_events(profiles,session_file_path,session_file_name)
+    if result is None:
+        print("No events found")
+        return
     #add the events to "active_events.csv"
-    result_list_dict=json.loads(result_string)
+    result_list_dict=json.loads(str(result))
     count = 0
     for item in result_list_dict:
         with open("active_events.csv", "a") as f:
@@ -202,11 +210,11 @@ def main():
     application = Application.builder().token("6824458794:AAFg_y1TNYDbb6ff2dgJfeFPT4UL_f6vdb0").build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("info", info_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, event_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     application.add_handler(CallbackQueryHandler(button_click))
-    schedule.every().week.do(fetch_weekly_events)
+    schedule.every().day.do(fetch_daily_events)
     schedule.every().day.do(remove_old_events)
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
