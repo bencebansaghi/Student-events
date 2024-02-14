@@ -43,7 +43,7 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Send a message when the command /info is issued."""
     await update.message.reply_html("This bot is hosted by LTKY(?) and was developed by Bence Bánsághi.\n"
                                     "For any issues, ideas or questions about the bot, please contact <a href='https://www.ltky/'>LTKY</a>.\n"
-                                    "The code of the bot is available on <a href='https://github.com/bencebansaghi/Student-events'>GitHub</a>."
+                                    "The code of the bot is available on <a href='https://github.com/bencebansaghi/Student-events'>GitHub</a>. "
                                     "For any inquiries about the code, feel free to contact me.\n")
 
 # This is the function that prints the events
@@ -174,7 +174,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # function that fetches the new events from the instagram accounts and adds them to "active_events.csv"
 def fetch_daily_events():
     print("Fetching daily events")
-    profiles = ["aether_ry", "lahoevents", "koeputkiappro", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry"]
+    profiles = ["aether_ry", "lahoevents", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry", "lastu_ry_", "fuusio_ry","sosa.ry","liikuapprolahti","kapital_ry","lut_es","rela.ry","lahti_es","cozycorner_club"]
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
     session_file_name = "\\session-bencebansaghi" # Name of the session file
     result=gpt_formater.return_formated_events(profiles,session_file_path,session_file_name)
