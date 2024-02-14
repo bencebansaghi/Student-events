@@ -3,7 +3,6 @@ from instaloader.structures import Profile
 from datetime import datetime, timedelta
 from itertools import dropwhile, takewhile
 import instaloader.exceptions
-import time
 from dotenv import load_dotenv
 import os
 import shutil
@@ -14,7 +13,7 @@ def purge_profiles_dir(session_file_path): # Deletes all the files in the profil
     if not os.path.exists(profiles_file):
         os.makedirs(profiles_file)
 
-def return_captions(profiles_array, session_file_path,session_file_name): # Returns the captions of the posts from the last week of the given profiles as an array
+def return_captions(profiles_array, session_file_path,session_file_name): # Returns the posts_array of the posts from the last week of the given profiles as an array
     with Instaloader(quiet=True,dirname_pattern=".\\profiles",max_connection_attempts=1) as L:
         try: #first we try to login with .env variables
             load_dotenv()
@@ -32,7 +31,7 @@ def return_captions(profiles_array, session_file_path,session_file_name): # Retu
             except Exception as e:
                 print(f"Both login methods failed, unknown error: {e}")
 
-    captions = []
+    posts_array = []
     for username in profiles_array:
         print(f"Getting posts of {username}")
         try:
@@ -49,23 +48,23 @@ def return_captions(profiles_array, session_file_path,session_file_name): # Retu
             try:
                 L.download_post(post, username)
                 print("Post downloaded.")
-                captions.append(post.caption)
+                posts_array.append({"link": "https://www.instagram.com/p/"+post.shortcode, "caption": str(post.caption).replace('\n', '')})
             except Exception as e:
                 print(f"Error while downloading post: {e}")
-    captions = [caption.replace('\n', '') for caption in captions] # The gpt formatter does not like newlines
     try:
-        purge_profiles_dir(session_file_path) #The way instaloader works, it downloads the posts to the profiles directory, so we need to delete them after we are done
+        #purge_profiles_dir(session_file_path) #The way instaloader works, it downloads the posts to the profiles directory, so we need to delete them after we are done
         print("Profiles folder emptied")
     except Exception as e:
         print(f"Unknown error while emptying profiles folder: {e}")
-    return captions
+    return posts_array
 
 if __name__ == "__main__":
     import pathlib
     profiles = ["aether_ry", "lahoevents", "koeputkiappro", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry"]
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
     session_file_name = "\\session-bencebansaghi" # Name of the session file
-    captions = return_captions(profiles,session_file_path,session_file_name)
-    for caption in captions:
-        print(caption)
+    posts_array = return_captions(profiles,session_file_path,session_file_name)
+    print(posts_array)
+    print(posts_array[1])
+    print(posts_array[1]["caption"])
 
