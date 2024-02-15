@@ -1,6 +1,6 @@
+from datetime import datetime
 import json
 import os
-import re
 from dotenv import load_dotenv
 from openai import OpenAI
 from get_insta_posts import return_captions
@@ -47,9 +47,8 @@ def return_formated_events(profiles,session_file_path,session_file_name):
                 model="gpt-3.5-turbo",
                 messages=[{
                     "role": "user", 
-                    "content": f'data: {post["caption"]}. Your job is to check if the data contains an event. If it does not contain an event, return python None. If it does contain an event, return its data in the following format: {{"date" : date of the event, format %d.%m.%Y , "name" : name of the event,"description" : short description of the event (maximum 6 sentences)}}. Translate both the event names and descriptions into English, if it is not already in English. If an event lacks a specific date, skip it, and return python None.'
+                    "content": f'data: {post["caption"]}. Your task is to identify any events in the data and return their information. The event must have a specific or easily recognizable name, date, and description. If the data does not have an event or a date, return None. Otherwise, return a dictionary with these keys and values: {{"date" : the event date in %d.%m.%Y format, "name" : the name of the event in English (up to 35 characters), "description" : a short summary of the event in English (up to four sentences)}}. Do not include anything else in the response. Translate the event name and description to English if they are in another language. If the data only has the month and day of the event, use {datetime.now().year} for the year. If the event lasts for more than one day, use the first day as the date and indicate that duration in the description.'
                 }],
-                
                 stream=True,
             )
             
@@ -62,9 +61,12 @@ def return_formated_events(profiles,session_file_path,session_file_name):
             print(f"Error while creating stream: {e}")
             return None
         combined_output = ''.join(output_array)
-        if combined_output is None or combined_output == "" or combined_output == "None":
+        if "date" not in combined_output or "name" not in combined_output or "description" not in combined_output or "None" in combined_output:
             continue
-        combined_output_dict=json.loads(combined_output)
+        try:
+            combined_output_dict=json.loads(combined_output)
+        except Exception as e:
+            continue
         combined_output_dict["link"]=post["link"]
         gptd_post_array.append(combined_output_dict)
 
