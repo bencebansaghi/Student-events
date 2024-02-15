@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
-import json
 import logging
+from matplotlib.pylab import f
 import schedule
 import io
 import pathlib
@@ -8,6 +8,7 @@ from telegram import InputFile, Update, ReplyKeyboardMarkup, InlineKeyboardButto
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler, CallbackContext
 import gpt_formater
 from ics import Calendar, Event
+import pickle
 
 # Enable logging
 logging.basicConfig(
@@ -46,93 +47,43 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                                     "The code of the bot is available on <a href='https://github.com/bencebansaghi/Student-events'>GitHub</a>. "
                                     "For any inquiries about the code, feel free to contact me.\n")
 
-# This is the function that prints the events
 async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a formatted message with an 'Add to Calendar' button."""
-    # This part handles the "All Events" button
-    if update.message.text.lower() == "all events":
-        with open("active_events.csv", "r") as f:
-            lines = f.readlines()
-            if not lines:
-                await update.message.reply_text("No events found.")
-            else:
-                # Create a list to store all events
-                all_events = []
-                today = datetime.now()
-
-                for line in lines:
-                    # Split only the first two commas to avoid splitting the description
-                    event_data = line.strip().split(",", 2)
-                    if len(event_data) >= 3:
-                        date_str, name, description = event_data[0], event_data[1], event_data[2]
-                        try:
-                            event_date = datetime.strptime(date_str, "%d.%m.%Y")
-                            all_events.append((date_str, name, description))
-                        except ValueError:
-                            pass
-
-                # Sort all events based on date
-                all_events.sort(key=lambda x: datetime.strptime(x[0], "%d.%m.%Y"))
-
-                # Send the formatted messages for all events
-                for event in all_events:
-                    date, name, description = event
-                    formatted_message = (
-                        f"*Name of the event:* {name}\n"
-                        f"*Date:* {date}\n\n"
-                        f"*Description:* {description}\n\n"
-                    )
-
-                    # Create an InlineKeyboardMarkup with 'Add to Calendar' button
-                    keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=f"add_to_calendar:{date}:{name}")]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-
-                    # Send the formatted message with the 'Add to Calendar' button
-                    await update.message.reply_markdown(formatted_message, reply_markup=reply_markup)
-
-    # And this part handles the "Events in the next week" button
-    elif "events in the next week" in update.message.text.lower():
-        with open("active_events.csv", "r") as f:
-            lines = f.readlines()
-            if not lines:
-                await update.message.reply_text("No events found.")
-            else:
-                # Create a list to store events within the next week
+    if "event" in update.message.text.lower(): #general case for all events printing
+        with open("active_events_pickle", "rb") as f:
+            all_events = []
+            try:
+                all_events = pickle.load(f)
+            except Exception as e:
+                print(f"Error while loading events: {e}")
+            # Sort all events based on date
+            all_events.sort(key=lambda x: x["date"])
+            
+            if "events in the next week" in update.message.text.lower(): # If the user wants to see events in the next week
                 next_week_events = []
-                today = datetime.now()
+                today = datetime.now().date()
+                for event in all_events:
+                    if today <= event["date"] <= today + timedelta(days=8):
+                        next_week_events.append(event)
+                all_events = next_week_events
+                
+            if not all_events or all_events == []:
+                await update.message.reply_text("No events found.")
+                return
+            for event in all_events:
+                formatted_message = (
+                    f"*Name of the event:* {event["name"]}\n"
+                    f"*Date:* {event["date"].strftime('%Y %B %d')}\n\n"
+                    f"*Description:* {event["description"]}\n"
+                )
 
-                for line in lines:
-                    event_data = line.strip().split(",", 2)
-                    if len(event_data) >= 3:
-                        date_str, name, description = event_data[0], event_data[1], event_data[2]
-                        try:
-                            event_date = datetime.strptime(date_str, "%d.%m.%Y")
-                            # Check if the event is within the next week
-                            if today <= event_date <= today + timedelta(days=7):
-                                next_week_events.append((date_str, name, description))
-                        except ValueError:
-                            pass
-                if len(next_week_events) == 0:
-                    await update.message.reply_text("No events found within the next week.")
-                    
-                # Sort next week events based on date
-                next_week_events.sort(key=lambda x: datetime.strptime(x[0], "%d.%m.%Y"))
+                callback_data=f"add_to_calendar:{event["date"]}:{event["name"]}"
+                callback_data = callback_data[:64] # The maximum length of callback_data is 64 characters, just to make sure it doesn't exceed that
+                
+                keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=callback_data),
+                            InlineKeyboardButton("Open Instagram Post", url=event["link"])]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
 
-                # Send the formatted messages for events within the next week
-                for event in next_week_events:
-                    date, name, description = event
-                    formatted_message = (
-                        f"*Name of the event:* {name}\n"
-                        f"*Date:* {date}\n\n"
-                        f"*Description:* {description}\n\n"
-                    )
-
-                    # Create an InlineKeyboardMarkup with 'Add to Calendar' button
-                    keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=f"add_to_calendar:{date}:{name}")]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-
-                    # Send the formatted message with the 'Add to Calendar' button
-                    await update.message.reply_markdown(formatted_message, reply_markup=reply_markup)
+                await update.message.reply_markdown(formatted_message, reply_markup=reply_markup)
 
 # This function handle the "add to calendar" button
 # It will create an iCalendar file and send it to the user
@@ -142,19 +93,19 @@ async def button_click(update: Update, context: CallbackContext) -> None:
     user_id = query.from_user.id
     data = query.data.split(':')
 
-    if data[0] == "add_to_calendar":
+    if data[0] == "calendar":
         date_str = data[1]
         event_name = data[2]
 
         # Convert the date string to a datetime object with midnight time
-        event_date = datetime.strptime(date_str, "%d.%m.%Y").replace(hour=0, minute=0, second=0)
+        event_date = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
 
         # Generate iCalendar file
         cal = Calendar()
         event = Event()
         event.name = event_name
         event.begin = event_date
-        event.make_all_day()  # Set the event to last the whole day
+        event.make_all_day()
         cal.events.add(event)
 
         # Convert the calendar to bytes
@@ -165,46 +116,59 @@ async def button_click(update: Update, context: CallbackContext) -> None:
         cal_file_input = InputFile(io.BytesIO(cal_bytes), filename=f"{event_name}.ics")
         await context.bot.send_document(chat_id=user_id, document=cal_file_input)
 
-        await query.answer("Event added to calendar!")
+
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Echo the user message."""
     await update.message.reply_text(update.message.text)
 
-# function that fetches the new events from the instagram accounts and adds them to "active_events.csv"
+# function that fetches the new events from the instagram accounts and adds them to "active_events_pickle"
 def fetch_daily_events():
     print("Fetching daily events")
-    profiles = ["aether_ry", "lahoevents", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry", "lastu_ry_", "fuusio_ry","sosa.ry","liikuapprolahti","kapital_ry","lut_es","rela.ry","lahti_es","cozycorner_club"]
+    profiles = ["aether_ry", "lahoevents", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry", "lastu_ry_", "fuusio_ry","sosa.ry","liikuapprolahti","kapital_ry","lut_es","rela.ry","lahti_es","cozycorner_club","lahti_es"]
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
     session_file_name = "\\session-bencebansaghi" # Name of the session file
-    result=gpt_formater.return_formated_events(profiles,session_file_path,session_file_name)
-    if result is None:
-        print("No events found")
+    result_dicts=gpt_formater.return_formated_events(profiles,session_file_path,session_file_name)
+    print(result_dicts)
+    if result_dicts is None or result_dicts == []:
+        print("No new events added to the file.")
         return
-    #add the events to "active_events.csv"
-    result_list_dict=json.loads(str(result))
     count = 0
-    for item in result_list_dict:
-        with open("active_events.csv", "a") as f:
-            #if date is in format %d.%m.%Y, append it to the file
-            try:
-                # Convert the string date to a datetime object
-                datetime.strptime(item["date"], "%d.%m.%Y")
-                f.write(f"{item['date']},{item['name']},{item['description']}\n")
-                count+=1
-            except ValueError:
-                pass
-    print(count, "new events added to the csv file.")
+    try:
+        with open("active_events_pickle", "rb") as f:
+            events=pickle.load(f)
+    except EOFError:
+        events = []
+    except Exception as e:
+        print(f"Error while loading previously added events: {e}")
+        events = []
+    for one_dict in result_dicts:
+        try:
+            one_dict["date"]= datetime.strptime(one_dict["date"], "%d.%m.%Y").date()
+            events.append(one_dict)
+            count += 1
+        except Exception as e:
+            print(f"Error while converting date: {e}")
+            continue
+    with open("active_events_pickle", "wb") as f:
+        pickle.dump(events, f)
+    print(count, "new events added to the file.")
                 
-# funtion that removes the events from "active_events.csv" when their date has passed
+# function that removes the old events from active_events_pickle
 def remove_old_events():
     print("Removing old events")
-    with open("active_events.csv", "r") as f:
-        lines = f.readlines()
-    with open("active_events.csv", "w") as f:
-        for line in lines:
-            if line.split(",")[0] > datetime.now().strftime("%d.%m.%Y"):
-                f.write(line)
+    events = []
+    count=0
+    with open("active_events_pickle", "rb") as f:
+        events=pickle.load(f)
+    with open("active_events_pickle", "wb") as f:
+        today=datetime.now().date()
+        for event in events:
+            if event["date"] < today:
+                events.remove(event)
+                count += 1
+        pickle.dump(events, f)
+    print(count, "old events removed from the file.")
 
 def main():
     application = Application.builder().token("6824458794:AAFg_y1TNYDbb6ff2dgJfeFPT4UL_f6vdb0").build()
@@ -214,6 +178,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, event_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     application.add_handler(CallbackQueryHandler(button_click))
+    
     schedule.every().day.do(fetch_daily_events)
     schedule.every().day.do(remove_old_events)
 
