@@ -1,14 +1,16 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import logging
+import os
 from matplotlib.pylab import f
 import schedule
 import io
 import pathlib
 from telegram import InputFile, Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler, CallbackContext, JobQueue
 import gpt_formater
 from ics import Calendar, Event
 import pickle
+import aiofiles
 
 # Enable logging
 logging.basicConfig(
@@ -76,7 +78,7 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     f"*Description:* {event["description"]}\n"
                 )
 
-                callback_data=f"add_to_calendar:{event["date"]}:{event["name"]}"
+                callback_data=f"calendar:{event["date"]}:{event["name"]}"
                 callback_data = callback_data[:64] # The maximum length of callback_data is 64 characters, just to make sure it doesn't exceed that
                 
                 keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=callback_data),
@@ -123,64 +125,82 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(update.message.text)
 
 # function that fetches the new events from the instagram accounts and adds them to "active_events_pickle"
-def fetch_daily_events():
+async def fetch_daily_events(context: CallbackContext):
     print("Fetching daily events")
     profiles = ["aether_ry", "lahoevents", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry", "lastu_ry_", "fuusio_ry","sosa.ry","liikuapprolahti","kapital_ry","lut_es","rela.ry","lahti_es","cozycorner_club","lahti_es"]
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
     session_file_name = "\\session-bencebansaghi" # Name of the session file
-    result_dicts=gpt_formater.return_formated_events(profiles,session_file_path,session_file_name)
-    print(result_dicts)
+    result_dicts = gpt_formater.return_formated_events(profiles, session_file_path, session_file_name)
+    
     if result_dicts is None or result_dicts == []:
         print("No new events added to the file.")
         return
+    
     count = 0
     try:
-        with open("active_events_pickle", "rb") as f:
-            events=pickle.load(f)
+        async with aiofiles.open("active_events_pickle", "rb") as f:
+            events = await f.read()
+            events = pickle.loads(events)
     except EOFError:
         events = []
     except Exception as e:
         print(f"Error while loading previously added events: {e}")
         events = []
+    
     for one_dict in result_dicts:
         try:
-            one_dict["date"]= datetime.strptime(one_dict["date"], "%d.%m.%Y").date()
+            one_dict["date"] = datetime.strptime(one_dict["date"], "%d.%m.%Y").date()
             events.append(one_dict)
             count += 1
         except Exception as e:
             print(f"Error while converting date: {e}")
             continue
-    with open("active_events_pickle", "wb") as f:
-        pickle.dump(events, f)
+
+    async with aiofiles.open("active_events_pickle", "wb") as f:
+        await f.write(pickle.dumps(events))
+
     print(count, "new events added to the file.")
                 
 # function that removes the old events from active_events_pickle
-def remove_old_events():
+async def remove_old_events(context: CallbackContext):
     print("Removing old events")
+    today = datetime.now().date()
     events = []
-    count=0
-    with open("active_events_pickle", "rb") as f:
-        events=pickle.load(f)
-    with open("active_events_pickle", "wb") as f:
-        today=datetime.now().date()
-        for event in events:
-            if event["date"] < today:
-                events.remove(event)
-                count += 1
-        pickle.dump(events, f)
-    print(count, "old events removed from the file.")
+    
+    # Asynchronously read the events from the file
+    async with aiofiles.open("active_events_pickle", "rb") as f:
+        events = await f.read()
+        events = pickle.loads(events)
+    
+    # Filter out old events
+    events = [event for event in events if event["date"] >= today]
+    
+    # Asynchronously write the updated events back to the file
+    async with aiofiles.open("active_events_pickle", "wb") as f:
+        await f.write(pickle.dumps(events))
+    
+    print(f"{len(events)} old events removed from the file.")
 
 def main():
-    application = Application.builder().token("6824458794:AAFg_y1TNYDbb6ff2dgJfeFPT4UL_f6vdb0").build()
-
+    BOT_TOKEN = os.environ.get("BOT_TOKEN")
+    application = Application.builder().token(BOT_TOKEN).build()
+    #Time in UTC
+    application.job_queue.run_daily(fetch_daily_events, time=time(hour=0, minute=10, second=0, microsecond=0))
+    application.job_queue.run_daily(remove_old_events, time=time(hour=0, minute=0, second=0, microsecond=0))
+    
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("info", info_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, event_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     application.add_handler(CallbackQueryHandler(button_click))
     
-    schedule.every().day.do(fetch_daily_events)
-    schedule.every().day.do(remove_old_events)
+
+    
+    """fetch_daily_events()
+    remove_old_events()"""
+    
+    """schedule.every().day.do(fetch_daily_events)
+    schedule.every().day.do(remove_old_events)"""
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
