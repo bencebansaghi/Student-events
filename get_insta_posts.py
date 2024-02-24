@@ -8,11 +8,6 @@ from dotenv import load_dotenv
 import os
 import shutil
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-
-
 def return_instaloader_session_with_login(session_file_path, session_file_name):
     L = Instaloader(
         quiet=True,
