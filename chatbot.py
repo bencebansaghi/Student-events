@@ -1,15 +1,18 @@
-from datetime import datetime, timedelta
-import json
+from datetime import datetime, timedelta, time
 import logging
-import schedule
+import os
+from dotenv import load_dotenv
 import io
 import pathlib
 from telegram import InputFile, Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler, CallbackContext
 import gpt_formater
 from ics import Calendar, Event
+import aiofiles
+import csv
+import aiocsv
 
-# Enable logging
+# Logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
@@ -17,11 +20,26 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
-# Define a few command handlers. These usually take the two arguments update and context.
+# Constants
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+INSTAGRAM_PAGES=os.getenv("INSTAGRAM_PAGES")
+if INSTAGRAM_PAGES:
+    INSTAGRAM_PAGES = INSTAGRAM_PAGES.split(",")
+    if len(INSTAGRAM_PAGES) == 0:
+        logging.error("INSTAGRAM_PAGES environment variable is empty.")
+        INSTAGRAM_PAGES = None
+else:
+    logging.error("INSTAGRAM_PAGES environment variable is not set.")
+CSV_FILE_PATH = os.getenv("CSV_FILE_PATH")
+if not CSV_FILE_PATH:
+    logging.error("CSV_FILE_PATH environment variable is not set.")
+    CSV_FILE_PATH = "active_events.csv"
+
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /start is issued."""
     user = update.effective_user
-    # Create a custom keyboard with two buttons
     keyboard = [
         [{"text": "All Events"}],
         [{"text": "Events in the next week"}],
@@ -39,122 +57,71 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=reply_markup,
     )
 
+
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /info is issued."""
-    await update.message.reply_html("This bot is hosted by LTKY(?) and was developed by Bence Bánsághi.\n"
-                                    "For any issues, ideas or questions about the bot, please contact <a href='https://www.ltky/'>LTKY</a>.\n"
+    await update.message.reply_html("This bot is funded by LTKY and is maintained and ran by Bence Bánsághi.\n"
+                                    "For any ideas for bot functionality, please contact <a href='https://www.ltky/'>LTKY</a>.\n"
                                     "The code of the bot is available on <a href='https://github.com/bencebansaghi/Student-events'>GitHub</a>. "
-                                    "For any inquiries about the code, feel free to contact me.\n")
+                                    "For any inquiries or issues about the code or bot functionality, feel free to contact me at on github or any of my socials.\n")
 
-# This is the function that prints the events
 async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a formatted message with an 'Add to Calendar' button."""
-    # This part handles the "All Events" button
-    if update.message.text.lower() == "all events":
-        with open("active_events.csv", "r") as f:
-            lines = f.readlines()
-            if not lines:
-                await update.message.reply_text("No events found.")
+    if "event" in update.message.text.lower():
+        all_events = await get_dicts_from_file()
+            
+        if "events in the next week" in update.message.text.lower():
+            next_week_events = []
+            today = datetime.now().date()
+            for event in all_events:
+                if today <= event["date"] <= today + timedelta(days=8):
+                    next_week_events.append(event)
+            all_events = next_week_events
+            
+        if not all_events or all_events == []:
+            await update.message.reply_text("No events found.")
+            return
+        for event in all_events:
+            formatted_message = (
+                f"*Name of the event:* {escape_markdown(event['name'])}\n"
+                f"*Date:* {escape_markdown(event['date'].strftime('%Y %B %d'))}\n\n"
+                f"*Description:* {escape_markdown(event['description'])}\n"
+            )
+            
+            calendar_date_string = event["date"].strftime("%Y-%m-%d")
+            callback_data = f"calendar:{calendar_date_string}:{event['name']}"
+            callback_data = callback_data[:64]  # The maximum length of callback_data is 64 characters
+            
+            if not event["link"] or event["link"] == "":  # Manually added events might not have a link
+                keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=callback_data)]]
             else:
-                # Create a list to store all events
-                all_events = []
-                today = datetime.now()
-
-                for line in lines:
-                    # Split only the first two commas to avoid splitting the description
-                    event_data = line.strip().split(",", 2)
-                    if len(event_data) >= 3:
-                        date_str, name, description = event_data[0], event_data[1], event_data[2]
-                        try:
-                            event_date = datetime.strptime(date_str, "%d.%m.%Y")
-                            all_events.append((date_str, name, description))
-                        except ValueError:
-                            pass
-
-                # Sort all events based on date
-                all_events.sort(key=lambda x: datetime.strptime(x[0], "%d.%m.%Y"))
-
-                # Send the formatted messages for all events
-                for event in all_events:
-                    date, name, description = event
-                    formatted_message = (
-                        f"*Name of the event:* {name}\n"
-                        f"*Date:* {date}\n\n"
-                        f"*Description:* {description}\n\n"
-                    )
-
-                    # Create an InlineKeyboardMarkup with 'Add to Calendar' button
-                    keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=f"add_to_calendar:{date}:{name}")]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-
-                    # Send the formatted message with the 'Add to Calendar' button
-                    await update.message.reply_markdown(formatted_message, reply_markup=reply_markup)
-
-    # And this part handles the "Events in the next week" button
-    elif "events in the next week" in update.message.text.lower():
-        with open("active_events.csv", "r") as f:
-            lines = f.readlines()
-            if not lines:
-                await update.message.reply_text("No events found.")
-            else:
-                # Create a list to store events within the next week
-                next_week_events = []
-                today = datetime.now()
-
-                for line in lines:
-                    event_data = line.strip().split(",", 2)
-                    if len(event_data) >= 3:
-                        date_str, name, description = event_data[0], event_data[1], event_data[2]
-                        try:
-                            event_date = datetime.strptime(date_str, "%d.%m.%Y")
-                            # Check if the event is within the next week
-                            if today <= event_date <= today + timedelta(days=7):
-                                next_week_events.append((date_str, name, description))
-                        except ValueError:
-                            pass
-                if len(next_week_events) == 0:
-                    await update.message.reply_text("No events found within the next week.")
-                    
-                # Sort next week events based on date
-                next_week_events.sort(key=lambda x: datetime.strptime(x[0], "%d.%m.%Y"))
-
-                # Send the formatted messages for events within the next week
-                for event in next_week_events:
-                    date, name, description = event
-                    formatted_message = (
-                        f"*Name of the event:* {name}\n"
-                        f"*Date:* {date}\n\n"
-                        f"*Description:* {description}\n\n"
-                    )
-
-                    # Create an InlineKeyboardMarkup with 'Add to Calendar' button
-                    keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=f"add_to_calendar:{date}:{name}")]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-
-                    # Send the formatted message with the 'Add to Calendar' button
-                    await update.message.reply_markdown(formatted_message, reply_markup=reply_markup)
+                keyboard = [[InlineKeyboardButton("Add to Calendar", callback_data=callback_data),
+                            InlineKeyboardButton("Open Instagram Post", url=event["link"])]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            try:
+                await update.message.reply_markdown_v2(formatted_message, reply_markup=reply_markup)
+            except Exception as e:
+                logging.error(f"Error while sending message in event {event['name']}: {e}")
 
 # This function handle the "add to calendar" button
 # It will create an iCalendar file and send it to the user
 async def button_click(update: Update, context: CallbackContext) -> None:
-    """Handle button clicks, including 'Add to Calendar' button."""
     query = update.callback_query
     user_id = query.from_user.id
     data = query.data.split(':')
 
-    if data[0] == "add_to_calendar":
+    if data[0] == "calendar":
         date_str = data[1]
         event_name = data[2]
 
         # Convert the date string to a datetime object with midnight time
-        event_date = datetime.strptime(date_str, "%d.%m.%Y").replace(hour=0, minute=0, second=0)
+        event_date = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
 
         # Generate iCalendar file
         cal = Calendar()
         event = Event()
         event.name = event_name
         event.begin = event_date
-        event.make_all_day()  # Set the event to last the whole day
+        event.make_all_day()
         cal.events.add(event)
 
         # Convert the calendar to bytes
@@ -165,57 +132,116 @@ async def button_click(update: Update, context: CallbackContext) -> None:
         cal_file_input = InputFile(io.BytesIO(cal_bytes), filename=f"{event_name}.ics")
         await context.bot.send_document(chat_id=user_id, document=cal_file_input)
 
-        await query.answer("Event added to calendar!")
+async def get_dicts_from_file(): # Returns list of dictionaries with date object, name, description, link keys, sorted by date
+    events = []
+    try:
+        async with aiofiles.open(CSV_FILE_PATH, 'r', newline='',encoding='utf-8') as file:
+            reader = aiocsv.AsyncDictReader(file)
+            async for event in reader:
+                events.append(event)
+    except FileNotFoundError:
+        logging.error("File not found.")
+    events_datetime = []
+    for event in events:
+        event["date"] = datetime.strptime(event["date"], "%d.%m.%Y").date()
+        events_datetime.append(event)
+    events_datetime.sort(key=lambda x: x["date"])
+    return events
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Echo the user message."""
-    await update.message.reply_text(update.message.text)
+def file_and_header_exists():
+    header_exists = False
+    try:
+        with open(CSV_FILE_PATH, 'r', newline='',encoding='utf-8') as f:
+            sample = f.read(2048)
+            header_exists = csv.Sniffer().has_header(sample)
+    except FileNotFoundError:
+        pass
+    return header_exists
 
-# function that fetches the new events from the instagram accounts and adds them to "active_events.csv"
-def fetch_daily_events():
-    print("Fetching daily events")
-    profiles = ["aether_ry", "lahoevents", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry", "lastu_ry_", "fuusio_ry","sosa.ry","liikuapprolahti","kapital_ry","lut_es","rela.ry","lahti_es","cozycorner_club"]
-    session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
-    session_file_name = "\\session-bencebansaghi" # Name of the session file
-    result=gpt_formater.return_formated_events(profiles,session_file_path,session_file_name)
-    if result is None:
-        print("No events found")
-        return
-    #add the events to "active_events.csv"
-    result_list_dict=json.loads(str(result))
-    count = 0
-    for item in result_list_dict:
-        with open("active_events.csv", "a") as f:
-            #if date is in format %d.%m.%Y, append it to the file
-            try:
-                # Convert the string date to a datetime object
-                datetime.strptime(item["date"], "%d.%m.%Y")
-                f.write(f"{item['date']},{item['name']},{item['description']}\n")
-                count+=1
-            except ValueError:
-                pass
-    print(count, "new events added to the csv file.")
+def escape_markdown(text): # Needed for reply_markdown
+    escape_chars = '_*~`>#+-=|{}.!()[]`'
+    return ''.join(['\\' + char if char in escape_chars else char for char in text])
+        
+async def write_new_events_to_file(events_dicts):
+    # checkto make sure the file exists and has a header even if there are no events to be added to not disrupt remover function
+    if not file_and_header_exists(): 
+            async with aiofiles.open(CSV_FILE_PATH, "w", newline='',encoding='utf-8') as f:
+                writer = aiocsv.AsyncDictWriter(f, fieldnames=["date", "name", "description", "link"])
+                await writer.writeheader()
                 
-# funtion that removes the events from "active_events.csv" when their date has passed
-def remove_old_events():
-    print("Removing old events")
-    with open("active_events.csv", "r") as f:
-        lines = f.readlines()
-    with open("active_events.csv", "w") as f:
-        for line in lines:
-            if line.split(",")[0] > datetime.now().strftime("%d.%m.%Y"):
-                f.write(line)
+    if not events_dicts:
+        logger.info("No new events added to the file.")
+        return
+
+    async with aiofiles.open(CSV_FILE_PATH, "a", newline='',encoding='utf-8') as f:
+        writer = aiocsv.AsyncDictWriter(f, fieldnames=["date", "name", "description", "link"])
+        added_event_counter = 0
+        for event in events_dicts:
+            await writer.writerow(event)
+            added_event_counter += 1
+        logging.info(f"{added_event_counter} new events added to the file.")
+    
+async def fetch_new_events_to_dicts():
+    logging.info("Fetching new events")
+    session_file_path = str(pathlib.Path(__file__).parent.resolve())
+    session_file_name = "session-lut_student_events"
+    result_dicts = []
+    if INSTAGRAM_PAGES:
+        try:
+            result_dicts = await gpt_formater.return_formated_events(INSTAGRAM_PAGES, session_file_path, session_file_name)
+        except Exception as e:
+            logging.error(f"Error while fetching events: {e}")
+        
+    if result_dicts:
+        return result_dicts
+    else:
+        return
+    
+async def add_new_events(context: CallbackContext) -> None:
+    new_events = await fetch_new_events_to_dicts()
+    await write_new_events_to_file(new_events)
+
+async def remove_old_events(context: CallbackContext) -> None:
+    today = datetime.now().date()
+    events = []
+    removed_event_counter = 0
+    tempfile_name="tempfile.csv"
+    
+    if not os.path.exists(CSV_FILE_PATH):
+        logging.warning("The file does not exist. No old events to remove.") # warning, because this function should only be called after add_new_events, which makes sure in 
+        return
+    
+    async with aiofiles.open(CSV_FILE_PATH, 'r', newline='',encoding='utf-8') as file:
+        reader = csv.DictReader(await file.read())
+        for event in reader:
+            event_date = datetime.strptime(event["date"], "%d.%m.%Y").date()
+            if event_date > today:
+                events.append(event)
+            else:
+                removed_event_counter += 1
+                
+    logging.info(f"{removed_event_counter} old events removed from the file.")
+
+    async with aiofiles.open(tempfile_name, "w", newline='',encoding='utf-8') as f:
+        writer = aiocsv.AsyncDictWriter(f, fieldnames=["date", "name", "description", "link"])
+        await writer.writeheader()
+        for event in events:
+            await writer.writerow(event)
+        os.replace(tempfile_name, "active_events.csv")
+
+    
 
 def main():
-    application = Application.builder().token("6824458794:AAFg_y1TNYDbb6ff2dgJfeFPT4UL_f6vdb0").build()
-
+    if BOT_TOKEN is None:
+        return
+    application = Application.builder().token(BOT_TOKEN).build()
+    application.job_queue.run_daily(add_new_events, time=time(hour=22, minute=0, second=0, microsecond=0))
+    application.job_queue.run_daily(remove_old_events, time=time(hour=22, minute=1, second=0, microsecond=0))
+    
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("info", info_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, event_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     application.add_handler(CallbackQueryHandler(button_click))
-    schedule.every().day.do(fetch_daily_events)
-    schedule.every().day.do(remove_old_events)
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
