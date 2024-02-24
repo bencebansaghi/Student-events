@@ -52,7 +52,7 @@ if not CSV_FILE_PATH:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user = update.effective_user
+    user = update.effective_user 
     keyboard = [
         [{"text": "All Events"}],
         [{"text": "Events in the next week"}],
