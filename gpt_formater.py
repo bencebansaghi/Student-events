@@ -34,7 +34,7 @@ async def create_stream_for_post(client:AsyncOpenAI,post):
             return None
         return output_array
     except Exception as e:
-        logging.error(f"Error while creating stream for post {post["link"]}: {e}")
+        logging.error(f"Error while creating stream for post {post['link']}: {e}")
         return None
 
 async def return_formated_events(profiles,session_file_path,session_file_name):
