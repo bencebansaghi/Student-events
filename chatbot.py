@@ -292,7 +292,6 @@ async def remove_old_events(context: CallbackContext) -> None:
 
 def main():
     if BOT_TOKEN is None:
-        logging.error("BOT_TOKEN environment variable is not set.")
         return
     application = Application.builder().token(BOT_TOKEN).build()
     application.job_queue.run_daily(
