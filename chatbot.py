@@ -28,7 +28,7 @@ import aiocsv
 
 # Logging
 logging.basicConfig(
-    filename='studentevents.log',
+    filename=os.path.join(pathlib.Path(__file__).parent.resolve(),'studentevents.log'),
     filemode='a',
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
