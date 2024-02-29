@@ -196,7 +196,7 @@ async def get_dicts_from_file():  # Returns list of dictionaries with date objec
         try: # It should always be in this format, but just in case
             event["date"] = datetime.strptime(event["date"], "%d.%m.%Y").date()
         except Exception as e:
-            logging.error(f"Error while converting date string to datetime object of event {event["name"]}: {e}")
+            logging.error(f"Error while converting date string to datetime object of event {event['name']}: {e}")
             continue
         events_datetime.append(event)
     return events_datetime
