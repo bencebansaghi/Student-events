@@ -28,6 +28,8 @@ import aiocsv
 
 # Logging
 logging.basicConfig(
+    filename='studentevents.log',
+    filemode='a',
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 # set higher logging level for httpx to avoid all GET and POST requests being logged
@@ -85,6 +87,8 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if "event" in update.message.text.lower():
         all_events = await get_dicts_from_file()
+        
+        all_events.sort(key=lambda x: x["date"])
 
         if "events in the next week" in update.message.text.lower():
             next_week_events = []
@@ -97,6 +101,8 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if not all_events or all_events == []:
             await update.message.reply_text("No events found.")
             return
+        
+        
         for event in all_events:
             formatted_message = (
                 f"*Name of the event:* {escape_markdown(event['name'])}\n"
@@ -187,10 +193,13 @@ async def get_dicts_from_file():  # Returns list of dictionaries with date objec
         logging.error("File not found.")
     events_datetime = []
     for event in events:
-        event["date"] = datetime.strptime(event["date"], "%d.%m.%Y").date()
+        try: # It should always be in this format, but just in case
+            event["date"] = datetime.strptime(event["date"], "%d.%m.%Y").date()
+        except Exception as e:
+            logging.error(f"Error while converting date string to datetime object of event {event["name"]}: {e}")
+            continue
         events_datetime.append(event)
-    events_datetime.sort(key=lambda x: x["date"])
-    return events
+    return events_datetime
 
 
 def file_and_header_exists():
