@@ -19,10 +19,10 @@ async def create_stream_for_post(client:AsyncOpenAI,post):
     try:
         current_year=datetime.now().year
         stream = await client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[{
                 "role": "user", 
-                "content": f'data: {post["caption"]}. Your task is to identify any events in the data and return their information. The event must have a specific or easily recognizable name, date, and description. If the data does not have an event or a date, return None. Otherwise, return a dictionary with these keys and values: {{"date" : the event date in strictly %d.%m.%Y format, "name" : the name of the event in English (up to 35 characters), "description" : a short summary of the event in English (up to four sentences)}}. Do not include anything else in the response. Translate the event name and description to English if they are in another language. If the data only has the month and day of the event, use {current_year} for the year. If the event lasts for more than one day, use the first day as the date and indicate that duration in the description.'
+                "content": f'data: {post["caption"]}. Your task is to identify any events in the data and return their information. The event must have a specific or easily recognizable name, date, and description. If the data does not have an event or a date, return None. Otherwise, return a json dictionary with these keys and values: {{"date" : the event date in strictly %d.%m.%Y format, "name" : the name of the event in English (up to 35 characters), "description" : a short summary of the event in English (up to four sentences)}}. Do not include anything else in the response. Translate the event name and description to English if they are in another language. If the data only has the month and day of the event, use {current_year} for the year. If the event lasts for more than one day, use the first day as the date and indicate that duration in the description.'
             }],
             stream=True,
         )
@@ -71,9 +71,15 @@ async def return_formated_events(profiles,session_file_path,session_file_name):
 if __name__ == "__main__":
     import pathlib
     import asyncio
-    profiles = ["aether_ry", "lahoevents", "koeputkiappro", "aleksinappro", "lasolary", "lymo.ry", "lirory", "Moveolahti", "koe_opku", "linkkiry", "lut_es"]
+    profiles = instagram_pages = [
+    "aether_ry", "lahoevents", "aleksinappro", "lasolary", "lymo.ry",
+    "lirory", "Moveolahti", "koe_opku", "linkkiry", "lastu_ry_",
+    "fuusio_ry", "sosa.ry", "liikuapprolahti", "kapital_ry", "lut_es",
+    "rela.ry", "lahti_es", "cozycorner_club", "lahti_es"
+]
+
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
-    session_file_name = "session-lut_student_events" # Name of the session file
+    session_file_name = "session-lafigagang" # Name of the session file
     #session_file_name = "session-bencebansaghi" # Name of the session file
     loop = asyncio.get_event_loop()
     captions_and_links = loop.run_until_complete(return_formated_events(profiles, session_file_path, session_file_name))

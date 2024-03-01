@@ -11,7 +11,7 @@ import shutil
 def return_instaloader_session_with_login(session_file_path, session_file_name):
     L = Instaloader(
         quiet=True,
-        dirname_pattern=os.path.join(".", "profiles"),
+        dirname_pattern=os.path.join(os.getcwd(), "profiles"),
         download_pictures=False,
         download_videos=False,
     )
