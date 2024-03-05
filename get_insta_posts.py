@@ -8,10 +8,17 @@ from dotenv import load_dotenv
 import os
 import shutil
 
+load_dotenv()
+PROFILES_FILE_PATH = os.getenv("PROFILES_FILE_PATH")
+if not PROFILES_FILE_PATH:
+    logging.warning("PROFILES_FILE_PATH not found in environment variables.")
+PROFILES_FILE_PATH = os.path.join(os.getcwd(), "profiles")
+
+
 def return_instaloader_session_with_login(session_file_path, session_file_name):
     L = Instaloader(
         quiet=True,
-        dirname_pattern=os.path.join(os.getcwd(), "profiles"),
+        dirname_pattern=PROFILES_FILE_PATH,
         download_pictures=False,
         download_videos=False,
     )
@@ -50,9 +57,7 @@ def return_instaloader_session_with_login(session_file_path, session_file_name):
 
 
 def purge_profiles_dir(session_file_path):
-    profiles_dir = os.path.join(
-        os.path.dirname(session_file_path), "profiles"
-    )  # Somewhy instaloader saves it one dir up
+    profiles_dir = PROFILES_FILE_PATH
     if os.path.exists(profiles_dir):
         shutil.rmtree(profiles_dir)
     os.makedirs(profiles_dir)
@@ -92,10 +97,21 @@ async def get_captions_and_links_dicts(
     profile_names_array, session_file_path, session_file_name
 ):
     try:
-        L = return_instaloader_session_with_login(session_file_path, session_file_name)
+        L = Instaloader(
+            quiet=True,
+            dirname_pattern=PROFILES_FILE_PATH,
+            download_pictures=False,
+            download_videos=False,
+        )
     except Exception as e:
-        logging.error(f"Error while creating instaloader session: {e}")
-        return None
+        logging.warning(f"Could not get instaloader session without logging in: {e}")
+        try:
+            L = return_instaloader_session_with_login(
+                session_file_path, session_file_name
+            )
+        except Exception as e:
+            logging.error(f"Error while creating instaloader session: {e}")
+            return None
 
     posts_array = []
     for username in profile_names_array:
