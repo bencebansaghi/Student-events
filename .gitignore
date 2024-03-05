@@ -4,3 +4,5 @@ api_key.py
 output.txt
 session*
 __pycache__/
+*.log
+.vscode/
