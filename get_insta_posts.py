@@ -9,16 +9,16 @@ import os
 import shutil
 
 load_dotenv()
-PROFILES_FILE_PATH = os.getenv("PROFILES_FILE_PATH")
-if not PROFILES_FILE_PATH:
-    logging.warning("PROFILES_FILE_PATH not found in environment variables.")
-PROFILES_FILE_PATH = os.path.join(os.getcwd(), "profiles")
+PROFILES_DIR_PATH = os.getenv("PROFILES_DIR_PATH")
+if not PROFILES_DIR_PATH:
+    logging.warning("PROFILES_DIR_PATH not found in environment variables.")
+PROFILES_DIR_PATH = os.path.join(os.getcwd(), "profiles")
 
 
 def return_instaloader_session_with_login(session_file_path, session_file_name):
     L = Instaloader(
         quiet=True,
-        dirname_pattern=PROFILES_FILE_PATH,
+        dirname_pattern=PROFILES_DIR_PATH,
         download_pictures=False,
         download_videos=False,
     )
@@ -57,7 +57,7 @@ def return_instaloader_session_with_login(session_file_path, session_file_name):
 
 
 def purge_profiles_dir(session_file_path):
-    profiles_dir = PROFILES_FILE_PATH
+    profiles_dir = PROFILES_DIR_PATH
     if os.path.exists(profiles_dir):
         shutil.rmtree(profiles_dir)
     os.makedirs(profiles_dir)
@@ -99,7 +99,7 @@ async def get_captions_and_links_dicts(
     try:
         L = Instaloader(
             quiet=True,
-            dirname_pattern=PROFILES_FILE_PATH,
+            dirname_pattern=PROFILES_DIR_PATH,
             download_pictures=False,
             download_videos=False,
         )
