@@ -78,7 +78,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_html(
         "This bot is funded by LTKY and is maintained and ran by Bence Bánsághi.\n"
-        "For any ideas for bot functionality, please contact <a href='https://www.ltky/'>LTKY</a>.\n"
+        "For any ideas for bot functionality, please contact <a href='https://www.ltky.fi'>LTKY</a>.\n"
         "The code of the bot is available on <a href='https://github.com/bencebansaghi/Student-events'>GitHub</a>. "
         "For any inquiries or issues about the code or bot functionality, feel free to contact me at on github or any of my socials.\n"
     )
