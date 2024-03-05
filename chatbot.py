@@ -180,7 +180,7 @@ async def button_click(update: Update, context: CallbackContext) -> None:
         await context.bot.send_document(chat_id=user_id, document=cal_file_input)
 
 
-async def get_dicts_from_file():  # Returns list of dictionaries with date object, name, description, link keys, sorted by date
+async def get_dicts_from_file():  # Returns list of dictionaries with date object, name, description, link keys
     events = []
     try:
         async with aiofiles.open(
@@ -268,7 +268,8 @@ async def add_new_events(context: CallbackContext) -> None:
 
 async def remove_old_events(context: CallbackContext) -> None:
     today = datetime.now().date()
-    events = []
+    events = get_dicts_from_file()
+    new_events=[]
     removed_event_counter = 0
     tempfile_name = "tempfile.csv"
 
@@ -278,14 +279,11 @@ async def remove_old_events(context: CallbackContext) -> None:
         )  # warning, because this function should only be called after add_new_events, which makes sure in
         return
 
-    async with aiofiles.open(CSV_FILE_PATH, "r", newline="", encoding="utf-8") as file:
-        reader = csv.DictReader(await file.read())
-        for event in reader:
-            event_date = datetime.strptime(event["date"], "%d.%m.%Y").date()
-            if event_date > today:
-                events.append(event)
-            else:
-                removed_event_counter += 1
+    for event in events:
+        if event["date"] >= today:
+            new_events.append(event)
+        else:
+            removed_event_counter += 1
 
     logging.info(f"{removed_event_counter} old events removed from the file.")
 
@@ -304,10 +302,10 @@ def main():
         return
     application = Application.builder().token(BOT_TOKEN).build()
     application.job_queue.run_daily(
-        add_new_events, time=time(hour=22, minute=0, second=0, microsecond=0)
+        add_new_events, time=time(hour=22, minute=0, second=0, microsecond=0), job_kwargs={'misfire_grace_time': 10}
     )
     application.job_queue.run_daily(
-        remove_old_events, time=time(hour=22, minute=1, second=0, microsecond=0)
+        remove_old_events, time=time(hour=22, minute=5, second=0, microsecond=0), job_kwargs={'misfire_grace_time': 10}
     )
 
     application.add_handler(CommandHandler("start", start))
