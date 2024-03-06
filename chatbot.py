@@ -56,8 +56,9 @@ if not CSV_FILE_PATH:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user 
     keyboard = [
-        [{"text": "All Events"}],
-        [{"text": "Events in the next week"}],
+        [{"text": "Events this week"},{"text": "Events next week"}],
+        [{"text": "Events this month"},{"text": "Events next month"}],
+        [{"text": "All Events"}]
     ]
     reply_markup = ReplyKeyboardMarkup(
         keyboard, one_time_keyboard=True, resize_keyboard=True
@@ -89,18 +90,54 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         all_events.sort(key=lambda x: x["date"])
 
-        if "events in the next week" in update.message.text.lower():
+        if "current week" in update.message.text.lower():
+            current_week_events = []
+            today = datetime.now().date()
+            year, week, _ = today.isocalendar() # Get the current week number
+            for event in all_events:
+                event_year, event_week, _ = event["date"].isocalendar() # Get the event week number
+                if year == event_year and week == event_week: # Check if the event is in the same week as today
+                    current_week_events.append(event)
+                else:break
+            all_events = current_week_events
+            
+        if "next week" in update.message.text.lower():
             next_week_events = []
             today = datetime.now().date()
+            year, week, _ = today.isocalendar() # Get the current week number
             for event in all_events:
-                if today <= event["date"] <= today + timedelta(days=8):
+                event_year, event_week, _ = event["date"].isocalendar() # Get the event week number
+                if year == event_year and week+1 == event_week: # Check if the event is in the same week as today
                     next_week_events.append(event)
+                else:break
             all_events = next_week_events
+
+        if "current month" in update.message.text.lower():
+            current_month_events = []
+            today = datetime.now().date()
+            year, month = today.year, today.month # Get the current month and year
+            for event in all_events:
+                event_year, event_month = event["date"].year, event["date"].month # Get the event month and year
+                if year == event_year and month == event_month: # Check if the event is in the same month as today
+                    current_month_events.append(event)
+                else:break
+            all_events = current_month_events
+
+        if "next month" in update.message.text.lower():
+            next_month_events = []
+            today = datetime.now().date()
+            year, month = today.year, today.month
+            for event in all_events:
+                event_year, event_month = event["date"].year, event["date"].month
+                if year == event_year and month+1 == event_month:
+                    next_month_events.append(event)
+                else:break
+            all_events = next_month_events
+            
 
         if not all_events or all_events == []:
             await update.message.reply_text("No events found.")
             return
-        
         
         for event in all_events:
             formatted_message = (
