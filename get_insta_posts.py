@@ -97,21 +97,12 @@ async def get_captions_and_links_dicts(
     profile_names_array, session_file_path, session_file_name
 ):
     try:
-        L = Instaloader(
-            quiet=True,
-            dirname_pattern=PROFILES_DIR_PATH,
-            download_pictures=False,
-            download_videos=False,
+        L = return_instaloader_session_with_login(
+            session_file_path, session_file_name
         )
     except Exception as e:
-        logging.warning(f"Could not get instaloader session without logging in: {e}")
-        try:
-            L = return_instaloader_session_with_login(
-                session_file_path, session_file_name
-            )
-        except Exception as e:
-            logging.error(f"Error while creating instaloader session: {e}")
-            return None
+        logging.error(f"Error while creating instaloader session: {e}")
+        return None
 
     posts_array = []
     for username in profile_names_array:
