@@ -69,8 +69,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"Hi, {user.mention_html()}!"
         "\nChoose an option from the keyboard below to get started.\n\n"
         "Available options:\n"
-        "📅 Show all events\n"
-        "📆 Show events in the next week\n\n"
+        "📆 Show events this week\n"
+        "📆 Show events next week\n"
+        "📆 Show events this month\n"
+        "📆 Show events next month\n"
+        "📅 Show all events\n\n"
         "For more information, type /info.",
         reply_markup=reply_markup,
     )
@@ -90,7 +93,7 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         all_events.sort(key=lambda x: x["date"])
 
-        if "current week" in update.message.text.lower():
+        if "this week" in update.message.text.lower():
             current_week_events = []
             today = datetime.now().date()
             year, week, _ = today.isocalendar() # Get the current week number
@@ -98,7 +101,6 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 event_year, event_week, _ = event["date"].isocalendar() # Get the event week number
                 if year == event_year and week == event_week: # Check if the event is in the same week as today
                     current_week_events.append(event)
-                else:break
             all_events = current_week_events
             
         if "next week" in update.message.text.lower():
@@ -109,10 +111,9 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 event_year, event_week, _ = event["date"].isocalendar() # Get the event week number
                 if year == event_year and week+1 == event_week: # Check if the event is in the same week as today
                     next_week_events.append(event)
-                else:break
             all_events = next_week_events
 
-        if "current month" in update.message.text.lower():
+        if "this month" in update.message.text.lower():
             current_month_events = []
             today = datetime.now().date()
             year, month = today.year, today.month # Get the current month and year
@@ -120,7 +121,6 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 event_year, event_month = event["date"].year, event["date"].month # Get the event month and year
                 if year == event_year and month == event_month: # Check if the event is in the same month as today
                     current_month_events.append(event)
-                else:break
             all_events = current_month_events
 
         if "next month" in update.message.text.lower():
@@ -131,7 +131,6 @@ async def event_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 event_year, event_month = event["date"].year, event["date"].month
                 if year == event_year and month+1 == event_month:
                     next_month_events.append(event)
-                else:break
             all_events = next_month_events
             
 
