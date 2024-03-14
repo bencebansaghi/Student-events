@@ -303,7 +303,7 @@ async def add_new_events(context: CallbackContext) -> None:
 
 async def remove_old_events(context: CallbackContext) -> None:
     today = datetime.now().date()
-    events = get_dicts_from_file()
+    events = await get_dicts_from_file()
     new_events=[]
     if not events:
         return
@@ -328,7 +328,7 @@ async def remove_old_events(context: CallbackContext) -> None:
                 f, fieldnames=["date", "name", "description", "link"]
             )
             await writer.writeheader()
-            for event in events:
+            for event in new_events:
                 await writer.writerow(event)
             os.replace(tempfile_name, CSV_FILE_PATH)
     except Exception as e:
