@@ -71,17 +71,14 @@ async def return_formated_events(profiles,session_file_path,session_file_name):
 if __name__ == "__main__":
     import pathlib
     import asyncio
-    profiles = instagram_pages = [
-    "aether_ry", "lahoevents", "aleksinappro", "lasolary", "lymo.ry",
-    "lirory", "Moveolahti", "koe_opku", "linkkiry", "lastu_ry_",
-    "fuusio_ry", "sosa.ry", "liikuapprolahti", "kapital_ry", "lut_es",
-    "rela.ry", "lahti_es", "cozycorner_club", "lahti_es"
-]
+    INSTAGRAM_PAGES = os.getenv("INSTAGRAM_PAGES")
+    if INSTAGRAM_PAGES:
+        INSTAGRAM_PAGES = INSTAGRAM_PAGES.split(",")
 
     session_file_path = str(pathlib.Path(__file__).parent.resolve()) # Get the path of the script
     session_file_name = "session-lafigagang" # Name of the session file
     #session_file_name = "session-bencebansaghi" # Name of the session file
     loop = asyncio.get_event_loop()
-    captions_and_links = loop.run_until_complete(return_formated_events(profiles, session_file_path, session_file_name))
+    captions_and_links = loop.run_until_complete(return_formated_events(INSTAGRAM_PAGES, session_file_path, session_file_name))
     print(captions_and_links)
 

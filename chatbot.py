@@ -305,6 +305,8 @@ async def remove_old_events(context: CallbackContext) -> None:
     today = datetime.now().date()
     events = get_dicts_from_file()
     new_events=[]
+    if not events:
+        return
     removed_event_counter = 0
     tempfile_name = "tempfile.csv"
 
@@ -320,17 +322,18 @@ async def remove_old_events(context: CallbackContext) -> None:
         else:
             removed_event_counter += 1
 
+    try:
+        async with aiofiles.open(tempfile_name, "w", newline="", encoding="utf-8") as f:
+            writer = aiocsv.AsyncDictWriter(
+                f, fieldnames=["date", "name", "description", "link"]
+            )
+            await writer.writeheader()
+            for event in events:
+                await writer.writerow(event)
+            os.replace(tempfile_name, CSV_FILE_PATH)
+    except Exception as e:
+        logging.error(f"Error while removing old events: {e}")
     logging.info(f"{removed_event_counter} old events removed from the file.")
-
-    async with aiofiles.open(tempfile_name, "w", newline="", encoding="utf-8") as f:
-        writer = aiocsv.AsyncDictWriter(
-            f, fieldnames=["date", "name", "description", "link"]
-        )
-        await writer.writeheader()
-        for event in events:
-            await writer.writerow(event)
-        os.replace(tempfile_name, "active_events.csv")
-
 
 def main():
     if BOT_TOKEN is None:
