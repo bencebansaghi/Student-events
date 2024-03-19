@@ -308,7 +308,8 @@ async def remove_old_events(context: CallbackContext) -> None:
     if not events:
         return
     removed_event_counter = 0
-    tempfile_name = "tempfile.csv"
+    tempfile_dir = os.path.dirname(CSV_FILE_PATH)
+    tempfile_path = os.path.join(tempfile_dir, "tempfile.csv")
 
     if not file_and_header_exists():
         logging.warning(
@@ -318,19 +319,20 @@ async def remove_old_events(context: CallbackContext) -> None:
 
     for event in events:
         if event["date"] >= today:
+            event["date"] = event["date"].strftime("%d.%m.%Y")
             new_events.append(event)
         else:
             removed_event_counter += 1
 
     try:
-        async with aiofiles.open(tempfile_name, "w", newline="", encoding="utf-8") as f:
+        async with aiofiles.open(tempfile_path, "w", newline="", encoding="utf-8") as f:
             writer = aiocsv.AsyncDictWriter(
                 f, fieldnames=["date", "name", "description", "link"]
             )
             await writer.writeheader()
             for event in new_events:
                 await writer.writerow(event)
-            os.replace(tempfile_name, CSV_FILE_PATH)
+            os.replace(tempfile_path, CSV_FILE_PATH)
     except Exception as e:
         logging.error(f"Error while removing old events: {e}")
     logging.info(f"{removed_event_counter} old events removed from the file.")
