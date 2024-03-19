@@ -279,13 +279,17 @@ async def write_new_events_to_file(events_dicts):
 
 async def fetch_new_events_to_dicts():
     logging.info("Fetching new events")
-    session_file_path = str(pathlib.Path(__file__).parent.resolve())
-    session_file_name = "session-lut_student_events"
+    SESSION_FILE_PATH = os.getenv("SESSION_FILE_PATH")
+    if not SESSION_FILE_PATH:
+        logging.error("SESSION_FILE_PATH environment variable is not set.")
+        return
+    session_file_dir  = os.path.dirname(SESSION_FILE_PATH)
+    session_file_name = os.path.basename(SESSION_FILE_PATH)
     result_dicts = []
     if INSTAGRAM_PAGES:
         try:
             result_dicts = await gpt_formater.return_formated_events(
-                INSTAGRAM_PAGES, session_file_path, session_file_name
+                INSTAGRAM_PAGES, session_file_dir, session_file_name
             )
         except Exception as e:
             logging.error(f"Error while fetching events: {e}")
@@ -302,6 +306,11 @@ async def add_new_events(context: CallbackContext) -> None:
 
 
 async def remove_old_events(context: CallbackContext) -> None:
+    if not file_and_header_exists():
+        logging.warning(
+            "The file does not exist. No old events to remove."
+        )  # warning, because this function should only be called after add_new_events, which makes sure in
+        return
     today = datetime.now().date()
     events = await get_dicts_from_file()
     new_events=[]
@@ -310,12 +319,6 @@ async def remove_old_events(context: CallbackContext) -> None:
     removed_event_counter = 0
     tempfile_dir = os.path.dirname(CSV_FILE_PATH)
     tempfile_path = os.path.join(tempfile_dir, "tempfile.csv")
-
-    if not file_and_header_exists():
-        logging.warning(
-            "The file does not exist. No old events to remove."
-        )  # warning, because this function should only be called after add_new_events, which makes sure in
-        return
 
     for event in events:
         if event["date"] >= today:
